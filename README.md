@@ -1,86 +1,100 @@
-# Introduction to Front-end development with Angular.js
-We will continue to build upon our directory application by creating a front-end interface with Angular.js to display listings, as well as the ability to add new listings and delete old ones.
+# Creating a server-side CRUD module using Express
+In assignment 1, we created a simple node server that retrieved our listings by responding to GET requests to '/listings'. You are now going to add more functionality to this server that allows us to **create**, **read**, **update**, and **delete** listings from a Mongo database. These tasks are commonly referred to as CRUD. 
 
-### HTML/CSS
-HTML (HyperText Markup Language) is a [**markup language**](https://en.wikipedia.org/wiki/Markup_language) most commonly used to create web pages. CSS (Cascading Style Sheets) is used to describe the presentation of our HTML pages. HTML and CSS are used along with Javascript to create web applications both simple and complex alike. 
+## Introduction to Express
 
-Please go through [this tutorial](http://learn.shayhowe.com) to learn the fundamentals of these two web technologies before continuing to the Bootstrap section. Keep in mind that this tutorial is very detailed and may take some time. Make sure to pay specific attention to:
+While these new requests could be handled in the same fashion as the original request handler, it would quickly become unweildly. There would need to be a bunch of conditional statements to handle requests to the different URL paths and different HTTP methods (such as POST, PUT, and DELETE). Luckily, the [**Express**](http://expressjs.com/en/index.html) library makes this task much simpler by providing a layer of abstraction for handling HTTP requests in a Node server. 
 
-- The semantic nature of HTML
-- Layering CSS styles in a modular fashion using multiple classes
-- The box model
-- Positioning content with CSS
+To provide an example, here is the request handler we wrote in assignment 1:
 
-### Bootstrap
-While we could create our web application with just HTML, CSS, and Javascript, writing all of our styles from scratch would be tedious. 
+```javascript
+var requestHandler = function(request, response) {
+  var parsedUrl = url.parse(request.url);
 
-Say we have an application that will be used by desktop, tablet, and mobile users alike. Our CSS would have to be **responsive**, changing the layout of the page depending on the user's device. Luckily, we have [**Bootstrap**](http://getbootstrap.com/), a responsive HTML/CSS/JS framework made by Twitter, to style our web applications. Bootstrap provides a [grid system](http://getbootstrap.com/css/#grid) for easy layout and [many components](http://getbootstrap.com/components/#nav) that will give the application a clean, modern, and consistent look. 
+  if(request.method === 'GET') {
+    if(parsedUrl.path === '/listings') {
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify(listingData));
+    } else {
+      response.writeHead(404);
+      response.end('Bad gateway error'); 
+    }
+  } else {
+    response.writeHead(404);
+    response.end('Bad gateway error');
+  }
+};
+```
 
-Bootstrap's documentation is extensive, so don't worry about memorizing everything Bootstrap has to offer. If you understand the fundamentals of HTML and CSS, you should feel comfortable with the mechanics of the grid system and using classes to add styles to your HTML components. It'll be a better use of time to just refer back to the documentation whenever you need to add a new component to your webpage. 
+Now here is the same request handler written using Express:
+```javascript
+app.get('/listings', function(req, res) {
+  res.send(listingData);
+});
 
-### Model-View-Controller (MVC) Architecture 
-A common design pattern used for developing user interfaces is the **model-view-controller** architecture. As the name suggests, in this architecture the application is broken up into three main components: 
+app.all('/*', function(req, res) {
+  res.status(404).send('Bad gateway error');
+});
+```
 
-- The **model** is where the application's main data objects are stored. 
-- The **view** presents models to the user, and allows the user to interact with the models
-- The **controller** interfaces between the model and the view
-    - it updates models according to input provided by the user in the view
-    - it updates the view when a model changes
+## Middleware
+Understanding the concept of **middleware** is extremely important in using Express effectively. Middleware allows you to invoke functions on a request before it reaches its final request handler. As a simple (yet quite useless) example, let's add a greeting to each request made to the server. 
 
-The MVC concept has many variations and often does not *exactly* follow the pattern described above. You can take a look at [this page](https://developer.chrome.com/apps/app_frameworks) for more information, or simply go a Google search for MVC architecture. 
+```javascript
+app.use(function(req, res, next) {
+  req.greeting = 'Hello there!';
+  next();
+});
 
-### Angular.js 
-[**Angular.js**](https://angularjs.org/) is a MVC-based framework (maintained by Google) for developing web applications. Angular makes it (relatively) easy to start building an application by extending HTML so that the markup can describe not only the static webpage but also dynamic behavior. 
+app.get('/', function(req, res) {
+  res.send(req.greeting);
+});
+```
+In addition to the usual request and response objects, we now pass an additional object called *next*. Invoking *next* will pass the request on to whatever function is next in line to handle it. 
 
-Angular would be difficult to succintly describe in this readme. The framework certainly has a learning curve, and you should take some time going through tutorials to understand the basics. Below is a list of resources that may be helpful. 
+Now, let's say the application we are building has users with administrative privledges. There will be certain routes that we want to make sure the user has the correct privledges before allowing the request to be handled. Using express, this becomes a relatively simple task:
 
-- **Code School**: [Shaping up with AngularJS](https://www.codeschool.com/courses/shaping-up-with-angular-js)
-- **Code Academy**: [Learn AngularJS](https://www.codecademy.com/learn/learn-angularjs)
-- [Tutorial provided from the AngularJS website](https://docs.angularjs.org/tutorial)
-- **Egghead.io's** [videos on AngularJS](https://egghead.io/technologies/angularjs)
+```javascript
+var checkPermissions = function(req, res, next) {
+  if(req.isAdmin === true) {
+    next();
+  } else {
+    res.status(400).send('User does not have permission to access this path');
+  }
+};
 
-You *do not* need to go through all of these, just start to get familiar enough with Angular-specific concepts to complete this assignment, particularly the following: 
-- [ng-model](https://docs.angularjs.org/api/ng/directive/ngModel)
-- [ng-repeat](https://docs.angularjs.org/api/ng/directive/ngRepeat)
-    - $index
-- [ng-click](https://docs.angularjs.org/api/ng/directive/ngClick)
-- [$scope](https://docs.angularjs.org/guide/scope)
+app.get('/privateData', checkPermissions, function(req, res) {
+  res.send('Some really critical information');
+});
+```
 
-### Assignment 
-As before, We have provided skeleton code that will help guide you in completing this assignment. 
-##### Files provided in Assignment #2
-- index.html
-- app.js
-- listingController.js
-- listingFactory.js
-- README
-- style.css
-- package.json
-##### Orientation to the files provided for this assignment:
-- In basic static HTML websites, **index.html** is the "homepage" or "landing page" when you visit a website. In node web applications, both index.html and app.js are used. 
-- **Index.html** has a basic template for the page and references the CSS frameworks
-is used to control the style of the content on the landing page. Thus, the index.html is the view that the user sees. 
-- **app.js** registers the dependencies (i.e., modules needed to run the app).
-- **style.css** - is the style formatting used to design the look and feel of the index.html page 
-- **listingController.js** - is a file that holds the code that Angular.js uses to control what is rendered on the browser in response to a user's interaction with the website
-- **listingFactory.js** - is that same content that we had in our listings.json file for Assignment #1 but formatted into an object that Angular.js can manipulate
-- **README** - You already know what this file contains.
+The checkPermissions function serves as *middleware* that is invoked before passing the request to its final destination. 
 
-#### Assignment Objectives
-Your objective is to create the front-end of our UF Directory App that will display the listings and allow the user to add and delete old ones. 
-To accomplish this you will:
-- modify the **listingController.js** file to  display listings, as well as the ability to add new listings and delete old ones.
-- 
-### Tasks 
-Take a look at the source code provided to you, and map out how the different files communicate with one another. You will notice there is a *factory*, a *controller*, and a *view* (provided by the index.html page). It is your responsibility to:
+A final note: **order matters** when using middleware. If you place `app.use()` after a request handler, that middleware will not be invoked. Keep this in mind when developing your applications in case you encounter bugs. 
 
-1. Complete the methods in the controller
-2. Implement the prompts in the HTML view to make the application functional
+If the concept of middleware is still confusing, you can read [this blog post](https://www.safaribooksonline.com/blog/2014/03/10/express-js-middleware-demystified/) for further information. 
 
-# Instructions: 
-1. Fork this repository and then navigate to it on your local machine's terminal 
-2. Implement the tasks listed above
-3. Check your that it works by looking at the index.html file in your favorit browser
-4. Points towards Project Bidding - Style your page using CSS
+## Assignment Details
+Now go ahead and clone this assignment's repository. You'll notice that the file structure of the application is now more involved than previous assignments. Browse around and take note of where each part of the application exists. 
 
-Note: Project Bidding Points give your group an edge over other groups for priority in choosing projects
+Navigate to `server/config/express.js`. This is where you will place code to configure your Express application. The **morgan** module is used to log requests to the console for debugging purposes. The **body parser** module is middleware that will allow you to access any data sent in requests as `req.body`. 
+
+In `server/routes/listings.server.routes.js`, you will find code that specifies the request handlers for CRUD tasks. To learn more about the Express router, [go to this page](http://expressjs.com/en/guide/routing.html) and scroll down to the section on *express.Router.*
+
+### Part 1
+Create a diagram of how the different parts of the server interact with one another. Specifially make note of: 
+   - what is defined in the controllers
+   - how the router makes use of the controllers to determine the flow of request handling
+   - how middleware is used throughout the application to modularize the code
+
+
+### Part 2
+
+1. Implement the request handlers in `listings.server.controller.js`
+    - test your implementation by running the tests found in `listings.server.routes.test.js`
+2. Complete the app configuration in `express.js`. 
+    - serve the static files found in the public folder when a user makes a request to the path `/`. [Refer to this documentation](http://expressjs.com/en/starter/static-files.html) for help
+    - use the listings router for requests going to the `/api/listings` path 
+    - direct users to the client side `index.html` file for requests to any other path
+3. Make sure your server is functioning correctly by starting it up by running the command `node server.js`
+
